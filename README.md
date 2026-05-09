@@ -1,162 +1,959 @@
-You are my senior full-stack engineer and AWS solutions architect.
+You are my senior full-stack engineer, AWS solutions architect, and live-demo coach.
 
-Build a production-style demo app called “BuilderHub AI”.
+Build a real AWS-powered demo app called “BuilderHub AI”.
 
-Context:
-This demo is for a student talk titled “The Innovation Fast-Track: Building with Cursor & AWS”.
-The goal is to show how students can move from “just coding” to shipping a real AI-powered community solution using Cursor and AWS.
+This app is for my talk:
+“The Innovation Fast-Track: Building with Cursor & AWS”
 
-App idea:
+Audience:
+Students, early builders, and community developers.
+
+Goal:
+Show how students can move from “just coding” to shipping real production-style cloud solutions using Cursor and AWS.
+
+The app should demonstrate this message:
+“Don’t just code faster — build smarter, ship sooner, and scale your impact.”
+
+====================================================================
+PACKAGE MANAGER REQUIREMENT
+====================================================================
+
+Use pnpm for everything.
+
+Do not use npm.
+Do not use yarn.
+Do not generate package-lock.json.
+Do not generate yarn.lock.
+Generate pnpm-lock.yaml.
+Generate pnpm-workspace.yaml.
+
+This project must use pnpm workspaces because it has:
+1. A Next.js frontend app at the root.
+2. An AWS CDK infrastructure package inside /infra.
+
+All README commands, deployment commands, scripts, and Amplify build commands must use pnpm.
+
+Before running any AWS deployment command, show me the exact AWS resources that will be created and ask me to confirm.
+
+Do not run cdk deploy unless I explicitly confirm.
+
+====================================================================
+MAIN APP IDEA
+====================================================================
+
 BuilderHub AI is an AI-powered community project platform for students and organizers.
 
 Users should be able to:
-1. View community projects.
-2. Submit a new project idea.
-3. Ask AI for feedback on a project.
-4. Receive AI-generated suggestions for:
-   - Better problem statement
-   - Possible AWS architecture
+
+1. Sign in using Amazon Cognito.
+2. View community projects.
+3. Submit a new project idea.
+4. Upload or attach a project-related file/image using Amazon S3.
+5. Ask AI for project feedback using Amazon Bedrock.
+6. Receive structured AI suggestions for:
+   - Improved problem statement
+   - Recommended AWS architecture
    - Security risks
    - Cost-saving ideas
-   - Next build steps
-5. View a simple organizer dashboard showing project count, feedback count, and recent submissions.
+   - 7-day build plan
+7. View an organizer dashboard with:
+   - Total project count
+   - Projects with AI feedback
+   - Projects needing feedback
+   - Most common AWS services suggested
+   - Recent submissions
 
-Tech stack:
-- Next.js 14+ with App Router
+This should use real AWS services, not just local mocks.
+
+However:
+- Do not hardcode AWS credentials.
+- Do not expose AWS credentials in frontend code.
+- Do not commit .env.local.
+- Do not place secrets in the browser.
+- Use IAM roles, AWS SDK, CDK outputs, and environment variables.
+- Keep the app simple enough for a live student demo.
+
+====================================================================
+AWS ARCHITECTURE TO IMPLEMENT
+====================================================================
+
+Frontend:
+- Next.js App Router
 - TypeScript
 - Tailwind CSS
-- shadcn/ui if available
-- Local JSON or in-memory storage for the first demo version
-- Create AWS-ready service files so the app can later connect to:
-  - Amazon Cognito for auth
-  - Amazon DynamoDB for project data
-  - Amazon S3 for uploads
-  - Amazon Bedrock for AI feedback
-  - Amazon CloudWatch for logs
+- AWS Amplify Hosting-ready
+- Calls deployed API Gateway endpoint
+- Uses Cognito auth configuration from environment variables
 
-Important:
-Do not require real AWS credentials for the first working version.
-Create a mock AI feedback service first.
-Also create an optional Amazon Bedrock service file that can be enabled later with environment variables.
-Never hardcode secrets.
-Include a .env.example file.
+Authentication:
+- Amazon Cognito User Pool
+- Cognito App Client
+- Cognito hosted UI or Amplify Auth integration
+- Public routes:
+  - Home page
+  - Project list page
+- Protected routes:
+  - Submit Project
+  - Project Detail AI feedback action
+  - File upload
+  - Dashboard
 
-Pages to build:
-1. Home page
-   - Hero title: “BuilderHub AI”
-   - Subtitle: “Turn student ideas into production-ready cloud projects.”
-   - Buttons: “Submit a Project” and “View Projects”
-   - Small section explaining the flow: Idea → AI Feedback → AWS Architecture → Ship
+Backend:
+- Amazon API Gateway
+- AWS Lambda functions written in TypeScript
+- Lambda functions should expose these API routes:
 
-2. Projects page
-   - Show project cards
-   - Each card should include:
-     - Project name
-     - Problem statement
-     - Target users
-     - Status
-     - Suggested AWS services
-   - Include sample projects relevant to Kenya student builders, for example:
-     - Campus event assistant
-     - AI agriculture advisory app
-     - Student study resource finder
-     - Community helpdesk chatbot
+  GET /projects
+  POST /projects
+  GET /projects/{id}
+  POST /projects/{id}/feedback
+  POST /projects/{id}/upload-url
+  GET /dashboard
 
-3. Submit Project page
-   - Form fields:
-     - Project name
-     - Problem statement
-     - Target users
-     - Current stage
-     - Main challenge
-   - On submit, save the project locally and redirect to a project detail page.
+- Add CORS properly for:
+  - localhost development
+  - deployed Amplify frontend domain
+- Use Cognito JWT authorizer for protected routes where practical.
+- Add clean request validation and good error messages.
 
-4. Project Detail page
-   - Show the submitted project.
-   - Add a button: “Get AI Feedback”
-   - When clicked, call an API route that returns structured AI feedback.
-   - Display feedback in clean cards:
-     - Improved problem statement
-     - Recommended AWS architecture
-     - Security checklist
-     - Cost optimization tips
-     - 7-day action plan
+Database:
+- Amazon DynamoDB table: BuilderHubProjects
+- Use on-demand billing mode.
+- Partition key: id
+- Suggested fields:
+  - id
+  - name
+  - problemStatement
+  - targetUsers
+  - currentStage
+  - mainChallenge
+  - status
+  - suggestedAwsServices
+  - aiFeedback
+  - ownerSub
+  - uploadedFiles
+  - createdAt
+  - updatedAt
 
-5. Dashboard page
-   - Show simple stats:
-     - Total projects
-     - Projects needing feedback
-     - Most common AWS services
-     - Recently submitted projects
+Optional indexes:
+- GSI by ownerSub
+- GSI by status
 
-API routes:
-- POST /api/projects
-- GET /api/projects
-- GET /api/projects/[id]
-- POST /api/ai-feedback
+Storage:
+- Amazon S3 bucket for project uploads.
+- Block all public access.
+- Enable encryption.
+- Use pre-signed upload URLs generated by Lambda.
+- Upload files directly from frontend to S3 using the pre-signed URL.
+- Store uploaded file metadata in DynamoDB.
+- Add a lifecycle rule for demo cleanup.
 
-Mock AI feedback:
-The mock AI should generate useful feedback based on the submitted project text.
-Make it feel realistic and specific, not generic.
+AI:
+- Use Amazon Bedrock Runtime from backend Lambda.
+- Use AWS SDK for JavaScript v3.
+- Use ConverseCommand from @aws-sdk/client-bedrock-runtime.
+- Read model ID from environment variable:
 
-AWS-ready architecture:
-Create a folder called /lib/aws with:
-- bedrock.ts
-- dynamodb.ts
-- s3.ts
-- cognito-notes.md
+  BEDROCK_MODEL_ID
 
-In bedrock.ts:
-- Add a placeholder function for calling Amazon Bedrock.
-- Use environment variables:
-  - AWS_REGION
-  - AWS_ACCESS_KEY_ID
-  - AWS_SECRET_ACCESS_KEY
-  - BEDROCK_MODEL_ID
-- Keep the mock implementation as the default unless USE_BEDROCK=true.
+- Read region from:
 
-UI style:
-Use a dark AWS-inspired theme:
+  AWS_REGION
+
+- Do not call Bedrock from the frontend.
+- Lambda should call Bedrock and return structured JSON.
+
+The AI feedback response should follow this shape:
+
+{
+  "improvedProblemStatement": "...",
+  "recommendedArchitecture": [
+    "..."
+  ],
+  "securityChecklist": [
+    "..."
+  ],
+  "costOptimizationTips": [
+    "..."
+  ],
+  "sevenDayActionPlan": [
+    "..."
+  ],
+  "suggestedAwsServices": [
+    "..."
+  ]
+}
+
+If Bedrock fails because model access is not enabled or the model is unavailable:
+- Return a clear user-friendly error to the frontend.
+- Log the technical error in CloudWatch.
+- Do not crash the app.
+- Add optional fallback only when USE_MOCK_AI=true.
+- Default should be real Bedrock.
+
+Observability:
+- Use CloudWatch Logs for Lambda.
+- Create CloudWatch log groups with short retention for demo.
+- Add useful structured logs in Lambda handlers.
+- Log request IDs, route names, and high-level error messages.
+- Do not log secrets or full auth tokens.
+
+Infrastructure:
+Create an /infra folder using AWS CDK v2 with TypeScript.
+
+The CDK stack should create:
+
+1. DynamoDB table
+2. S3 uploads bucket
+3. Cognito User Pool
+4. Cognito App Client
+5. Cognito domain if needed
+6. API Gateway
+7. Lambda functions
+8. IAM permissions for:
+   - Lambda read/write to DynamoDB
+   - Lambda read/write to S3
+   - Lambda invoke Bedrock model
+   - Lambda write CloudWatch logs
+9. CloudWatch log groups with short retention
+10. Useful CloudFormation outputs:
+   - API_BASE_URL
+   - USER_POOL_ID
+   - USER_POOL_CLIENT_ID
+   - COGNITO_DOMAIN
+   - UPLOADS_BUCKET_NAME
+   - DYNAMODB_TABLE_NAME
+   - AWS_REGION
+
+Use least-privilege IAM as much as possible.
+Do not use AdministratorAccess policies in generated IAM roles.
+Do not create unnecessary resources.
+
+Because this is a demo stack:
+- Use RemovalPolicy.DESTROY.
+- Enable auto-delete objects for the demo S3 bucket if practical.
+- Include clear cleanup instructions.
+- Mention that production stacks should use safer removal policies.
+
+====================================================================
+PROJECT STRUCTURE
+====================================================================
+
+Create this structure:
+
+builderhub-ai/
+  pnpm-workspace.yaml
+  package.json
+  tsconfig.json
+  next.config.js
+  tailwind.config.ts
+  postcss.config.js
+  amplify.yml
+  .env.example
+  README.md
+
+  app/
+    layout.tsx
+    page.tsx
+    globals.css
+    projects/
+      page.tsx
+      [id]/
+        page.tsx
+    submit/
+      page.tsx
+    dashboard/
+      page.tsx
+    auth/
+      callback/
+        page.tsx
+
+  components/
+    AppShell.tsx
+    Navbar.tsx
+    ProjectCard.tsx
+    FeedbackPanel.tsx
+    ArchitectureBadge.tsx
+    DashboardStats.tsx
+    UploadBox.tsx
+    AuthGuard.tsx
+    ui/
+
+  lib/
+    api.ts
+    auth.ts
+    types.ts
+    utils.ts
+    aws-client-notes.md
+
+  lambda/
+    handlers/
+      projects.ts
+      feedback.ts
+      upload-url.ts
+      dashboard.ts
+    shared/
+      dynamodb.ts
+      s3.ts
+      bedrock.ts
+      response.ts
+      validation.ts
+      auth.ts
+      types.ts
+
+  scripts/
+    seed.ts
+
+  infra/
+    package.json
+    tsconfig.json
+    cdk.json
+    bin/
+      builderhub.ts
+    lib/
+      builderhub-stack.ts
+
+====================================================================
+PNPM WORKSPACE CONFIGURATION
+====================================================================
+
+Create pnpm-workspace.yaml:
+
+packages:
+  - "infra"
+
+Root package.json should include:
+
+{
+  "name": "builderhub-ai",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "deploy:infra": "pnpm --filter infra cdk:deploy",
+    "destroy:infra": "pnpm --filter infra cdk:destroy",
+    "cdk:synth": "pnpm --filter infra cdk:synth",
+    "seed": "tsx scripts/seed.ts"
+  }
+}
+
+Infra package.json should include:
+
+{
+  "name": "infra",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "cdk:synth": "cdk synth",
+    "cdk:deploy": "cdk deploy",
+    "cdk:destroy": "cdk destroy",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  }
+}
+
+Use pnpm commands everywhere.
+
+Do not include npm install.
+Do not include npm run.
+Do not include npx unless absolutely necessary.
+Prefer pnpm dlx if a one-off command is required.
+
+====================================================================
+FRONTEND PAGES
+====================================================================
+
+1. Home Page
+
+Route:
+/
+
+Content:
+- Hero title: “BuilderHub AI”
+- Subtitle: “Turn student ideas into production-ready cloud projects.”
+- CTA buttons:
+  - “Submit a Project”
+  - “View Projects”
+- Show builder flow:
+  Idea → AI Feedback → AWS Architecture → Deploy → Monitor
+- Show AWS service badges:
+  - Cognito
+  - API Gateway
+  - Lambda
+  - DynamoDB
+  - S3
+  - Bedrock
+  - CloudWatch
+
+Style:
 - Dark navy background
-- Orange, blue, purple, and green accents
-- Clean cards
+- AWS orange accents
+- Blue, purple, and green service-card accents
+- Rounded cards
+- Clean conference-demo look
+- Match an AWS Student Builder Group presentation style
+
+2. Projects Page
+
+Route:
+/projects
+
+Functionality:
+- Fetch projects from API Gateway.
+- Show project cards.
+- Each card should include:
+  - Project name
+  - Problem statement
+  - Target users
+  - Status
+  - Suggested AWS services
+- Include:
+  - Loading state
+  - Empty state
+  - Error state
+
+3. Submit Project Page
+
+Route:
+/submit
+
+Functionality:
+- Require sign-in.
+- Form fields:
+  - Project name
+  - Problem statement
+  - Target users
+  - Current stage
+  - Main challenge
+
+On submit:
+- Call POST /projects
+- Save into DynamoDB through Lambda
+- Redirect to project detail page
+
+4. Project Detail Page
+
+Route:
+/projects/[id]
+
+Functionality:
+- Fetch project by ID from API Gateway.
+- Show full project details.
+- Add upload section:
+  - Request S3 pre-signed upload URL from POST /projects/{id}/upload-url
+  - Upload file directly to S3
+  - Show uploaded file name/status
+
+Add button:
+“Get AI Feedback”
+
+When clicked:
+- Call POST /projects/{id}/feedback
+- Lambda invokes Amazon Bedrock
+- Save AI feedback into DynamoDB
+- Display feedback in clean cards:
+  - Improved problem statement
+  - Recommended AWS architecture
+  - Security checklist
+  - Cost optimization tips
+  - 7-day action plan
+  - Suggested AWS services
+
+5. Dashboard Page
+
+Route:
+/dashboard
+
+Functionality:
+- Require sign-in.
+- Fetch real dashboard data from API Gateway.
+- Show:
+  - Total projects
+  - Projects with AI feedback
+  - Projects without AI feedback
+  - Most common AWS services
+  - Recently submitted projects
+
+====================================================================
+LAMBDA API DETAILS
+====================================================================
+
+Create Lambda handlers in TypeScript.
+
+Use AWS SDK v3.
+
+Use these shared helper modules:
+
+lambda/shared/dynamodb.ts
+- DynamoDB client
+- createProject
+- getProject
+- listProjects
+- updateProjectFeedback
+- getDashboardStats
+
+lambda/shared/s3.ts
+- S3 client
+- createPresignedUploadUrl
+
+lambda/shared/bedrock.ts
+- Bedrock Runtime client
+- generateProjectFeedback
+- Uses ConverseCommand
+- Parses structured JSON safely
+- Handles model errors gracefully
+
+lambda/shared/response.ts
+- jsonResponse
+- errorResponse
+- corsHeaders
+
+lambda/shared/validation.ts
+- validateProjectInput
+- validateUploadRequest
+
+lambda/shared/auth.ts
+- Extract Cognito user sub from request claims where available
+
+API behavior:
+
+GET /projects
+- Public
+- Return list of projects
+
+POST /projects
+- Protected
+- Create project in DynamoDB
+- Associate ownerSub with Cognito user sub
+
+GET /projects/{id}
+- Public
+- Return project by ID
+
+POST /projects/{id}/feedback
+- Protected
+- Fetch project from DynamoDB
+- Call Amazon Bedrock
+- Save feedback back into DynamoDB
+- Return feedback
+
+POST /projects/{id}/upload-url
+- Protected
+- Create pre-signed S3 upload URL
+- Return uploadUrl and objectKey
+- Store file metadata after upload if practical
+
+GET /dashboard
+- Protected
+- Return summary stats from DynamoDB
+
+====================================================================
+BEDROCK PROMPTING
+====================================================================
+
+In the Bedrock Lambda, use a clear system prompt like:
+
+“You are an AWS solutions architect helping student builders turn project ideas into production-ready cloud applications. Give practical, beginner-friendly, security-aware, and cost-aware advice. Return only valid JSON.”
+
+User prompt should include:
+- Project name
+- Problem statement
+- Target users
+- Current stage
+- Main challenge
+
+The model should return valid JSON with:
+
+{
+  "improvedProblemStatement": "string",
+  "recommendedArchitecture": ["string"],
+  "securityChecklist": ["string"],
+  "costOptimizationTips": ["string"],
+  "sevenDayActionPlan": ["string"],
+  "suggestedAwsServices": ["string"]
+}
+
+Add defensive parsing:
+- Try JSON.parse
+- If parsing fails, return a structured fallback error
+- Log parsing failure to CloudWatch
+
+====================================================================
+SAMPLE DATA / SEED SCRIPT
+====================================================================
+
+Create a seed script:
+
+scripts/seed.ts
+
+It should insert sample projects into DynamoDB only when manually run:
+
+pnpm seed
+
+Sample projects:
+
+1. Campus Event Assistant
+Problem:
+Students miss important campus events because information is spread across WhatsApp groups, posters, and emails.
+Suggested AWS:
+Cognito, API Gateway, Lambda, DynamoDB, Bedrock, SES
+
+2. AI Agriculture Advisory App
+Problem:
+Small-scale farmers need simple crop guidance based on weather, soil, and local farming practices.
+Suggested AWS:
+S3, Lambda, DynamoDB, Bedrock, CloudWatch
+
+3. Student Study Resource Finder
+Problem:
+Students struggle to find quality study resources matched to their course, level, and weak topics.
+Suggested AWS:
+Bedrock Knowledge Base, S3, DynamoDB, Lambda
+
+4. Community Helpdesk Chatbot
+Problem:
+Community organizers repeatedly answer the same questions about events, registration, and resources.
+Suggested AWS:
+Bedrock, API Gateway, Lambda, DynamoDB, CloudWatch
+
+5. Scholarship Opportunity Tracker
+Problem:
+Students miss scholarship deadlines because opportunities are hard to track across many platforms.
+Suggested AWS:
+EventBridge, Lambda, DynamoDB, SES, Bedrock
+
+Do not seed automatically on every deploy.
+
+====================================================================
+ENVIRONMENT VARIABLES
+====================================================================
+
+Create .env.example:
+
+NEXT_PUBLIC_API_BASE_URL=
+NEXT_PUBLIC_AWS_REGION=
+NEXT_PUBLIC_COGNITO_USER_POOL_ID=
+NEXT_PUBLIC_COGNITO_USER_POOL_CLIENT_ID=
+NEXT_PUBLIC_COGNITO_DOMAIN=
+
+BEDROCK_MODEL_ID=
+USE_MOCK_AI=false
+
+UPLOADS_BUCKET_NAME=
+DYNAMODB_TABLE_NAME=
+
+Also explain that .env.local should be created locally and should not be committed.
+
+====================================================================
+AMPLIFY HOSTING CONFIG
+====================================================================
+
+Create amplify.yml using pnpm:
+
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - corepack enable
+        - pnpm install --frozen-lockfile
+    build:
+      commands:
+        - pnpm build
+  artifacts:
+    baseDirectory: .next
+    files:
+      - "**/*"
+  cache:
+    paths:
+      - node_modules/**/*
+      - .next/cache/**/*
+      - ~/.pnpm-store/**/*
+
+Make sure README explains how to deploy the frontend to AWS Amplify Hosting after the backend infrastructure has been deployed.
+
+====================================================================
+README REQUIREMENTS
+====================================================================
+
+Create a complete README.md with these sections:
+
+1. Project overview
+2. What the demo shows
+3. Architecture overview
+4. Text architecture diagram
+5. AWS resources created
+6. Cost and cleanup warning
+7. Prerequisites
+8. Environment variables
+9. Local development
+10. Deploying infrastructure with CDK
+11. Seeding sample data
+12. Deploying frontend with AWS Amplify Hosting
+13. Live demo flow
+14. Troubleshooting
+15. Cleanup
+
+README commands must use pnpm only.
+
+Use these commands:
+
+Install dependencies:
+pnpm install
+
+Run locally:
+pnpm dev
+
+Typecheck:
+pnpm typecheck
+
+Build:
+pnpm build
+
+Synthesize AWS CDK:
+pnpm cdk:synth
+
+Deploy infrastructure:
+pnpm deploy:infra
+
+Seed sample data:
+pnpm seed
+
+Destroy infrastructure:
+pnpm destroy:infra
+
+Troubleshooting section should include:
+
+- Cognito callback URL mismatch
+- CORS error
+- Bedrock model access error
+- Missing AWS credentials
+- API Gateway authorizer error
+- DynamoDB permission error
+- S3 upload error
+- Amplify environment variable error
+
+====================================================================
+LIVE DEMO FLOW
+====================================================================
+
+Create a README section called “Live Demo Flow”.
+
+Use this demo flow:
+
+1. Open BuilderHub AI homepage.
+2. Explain the flow:
+   Idea → AI Feedback → AWS Architecture → Deploy → Monitor
+3. Sign in with Cognito.
+4. View existing student projects.
+5. Submit a new project idea.
+6. Upload a project file to S3.
+7. Open the project detail page.
+8. Click “Get AI Feedback”.
+9. Show Bedrock-generated feedback.
+10. Open the dashboard.
+11. Explain how each part maps to AWS:
+
+   Frontend:
+   AWS Amplify Hosting
+
+   Auth:
+   Amazon Cognito
+
+   API:
+   Amazon API Gateway
+
+   Compute:
+   AWS Lambda
+
+   Data:
+   Amazon DynamoDB
+
+   Files:
+   Amazon S3
+
+   AI:
+   Amazon Bedrock
+
+   Logs:
+   Amazon CloudWatch
+
+   Infrastructure:
+   AWS CDK
+
+====================================================================
+TEXT ARCHITECTURE DIAGRAM FOR README
+====================================================================
+
+Add this architecture diagram to the README:
+
+Students / Organizers
+        |
+        v
+AWS Amplify Hosting / CloudFront
+Next.js Frontend
+        |
+        | Cognito Authentication
+        v
+Amazon API Gateway
+        |
+        v
+AWS Lambda
+        |
+        +----------------------+
+        |                      |
+        v                      v
+Amazon DynamoDB          Amazon S3
+Project data             File uploads
+        |
+        v
+Amazon Bedrock
+AI project feedback
+
+Cross-cutting:
+Cognito + IAM
+CloudWatch Logs
+CDK Infrastructure
+S3 Encryption
+DynamoDB On-Demand Billing
+
+====================================================================
+UI STYLE
+====================================================================
+
+Use a dark AWS-inspired theme:
+
+- Dark navy background
+- AWS orange highlights
+- Blue service cards
+- Purple AI cards
+- Green data cards
 - Rounded corners
+- Clean spacing
 - Professional conference-demo look
-- Make it match an AWS Student Builder Group presentation style.
+- Student-friendly wording
+- Visually match an AWS Student Builder Group slide style
 
-Demo flow:
-The final app should support this live demo:
-1. Open homepage.
-2. Show project cards.
-3. Submit a new project idea.
-4. Open the project detail page.
-5. Click “Get AI Feedback”.
-6. Explain how this maps to AWS:
-   - Frontend: Amplify Hosting
-   - API: API Gateway + Lambda
-   - Data: DynamoDB + S3
-   - AI: Amazon Bedrock
-   - Identity: Cognito
-   - Observability: CloudWatch
-   - Delivery: GitHub Actions + CDK/Terraform
+Use cards and badges for AWS services.
 
-Code quality:
-- Use clean component structure.
-- Use TypeScript types.
-- Add comments where useful.
+Make the app look polished enough to show live during a talk.
+
+Avoid clutter.
+
+====================================================================
+SECURITY AND COST GUARDRAILS
+====================================================================
+
+Add these guardrails:
+
+- Never hardcode credentials.
+- Never expose AWS secrets in frontend code.
+- Use environment variables for config.
+- Use Cognito for authentication.
+- Use IAM least privilege where possible.
+- Block public access on S3.
+- Enable S3 encryption.
+- Use DynamoDB on-demand billing.
+- Use short CloudWatch log retention for demo.
+- Use S3 lifecycle cleanup.
+- Use RemovalPolicy.DESTROY only because this is a demo stack.
+- Add clear instructions for pnpm destroy:infra.
+- Add a warning that real AWS resources may incur costs.
+- Do not deploy until I explicitly confirm.
+
+====================================================================
+DEVELOPMENT STEPS
+====================================================================
+
+Follow this process:
+
+1. Inspect the project folder first.
+2. Generate the Next.js app structure.
+3. Generate Lambda handlers.
+4. Generate shared backend helpers.
+5. Generate AWS CDK infrastructure.
+6. Generate pnpm workspace config.
+7. Generate .env.example.
+8. Generate amplify.yml.
+9. Generate README.md.
+10. Run typecheck.
+11. Fix TypeScript errors.
+12. Run build.
+13. Fix build errors.
+14. Run CDK synth.
+15. Fix CDK synth errors.
+16. Stop before deployment.
+17. Show me the AWS resources that will be created.
+18. Ask me to confirm before deploying.
+
+Do not run:
+
+pnpm deploy:infra
+
+until I explicitly confirm.
+
+Do not run:
+
+pnpm destroy:infra
+
+unless I explicitly ask.
+
+====================================================================
+QUALITY REQUIREMENTS
+====================================================================
+
+- TypeScript everywhere.
+- Clean reusable components.
+- Clean Lambda handlers.
+- Good error handling.
+- Good loading states.
+- Clear empty states.
+- Clear error states.
+- No fake AWS labels.
+- Use actual AWS integrations.
+- Keep the app simple enough for a live demo.
+- Keep the code understandable for students.
+- Use comments where helpful.
 - Avoid overengineering.
-- Make sure the app runs with:
-  npm install
-  npm run dev
+- Make sure the app can run locally with:
 
-Deliverables:
-- Full working Next.js app
-- Clean UI
-- Mock data
-- AI feedback endpoint
-- AWS-ready service placeholders
-- README.md with:
-  - How to run locally
-  - Demo script
-  - AWS architecture mapping
-  - Next steps for deploying to AWS Amplify
+  pnpm install
+  pnpm dev
+
+- Make sure infrastructure can be checked with:
+
+  pnpm cdk:synth
+
+- Make sure the final README is beginner-friendly.
+
+====================================================================
+FINAL DELIVERABLES
+====================================================================
+
+Deliver:
+
+1. Working Next.js frontend
+2. Real AWS CDK infrastructure
+3. Cognito authentication setup
+4. API Gateway routes
+5. Lambda functions
+6. DynamoDB table integration
+7. S3 upload integration with pre-signed URLs
+8. Amazon Bedrock feedback integration
+9. CloudWatch logging
+10. pnpm workspace setup
+11. amplify.yml for AWS Amplify Hosting
+12. .env.example
+13. README.md with pnpm commands
+14. Seed script for demo projects
+15. Live demo script
+
+Remember:
+Use pnpm only.
+Use real AWS resources.
+Do not hardcode secrets.
+Do not deploy until I confirm.
